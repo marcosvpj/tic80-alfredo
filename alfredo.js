@@ -5,6 +5,7 @@
 // license: MIT License (change this to your license of choice)
 // version: 0.1
 // script:  js
+// saveid:  alfredowagner
 
 function limitXY(e){
 	if(e.x>234)e.x--
@@ -12,14 +13,12 @@ function limitXY(e){
 	if(e.y<25)e.y++
 	if(e.y>127)e.y--
 }
-function label(e,s){print(s,e.x,e.y+10)}
+function label(e,s){/*print(s,e.x,e.y+10)*/}
 function update(e,i,a){	e.update(e,i,a)}
 function draw(e,i,arr){	if(!!e.draw) {e.draw(e)}}
 function rnd(m){ return Math.floor(Math.random() * m)}
 
 var t=0
-var x=96
-var y=24
 var hour=0
 var day=0
 
@@ -84,12 +83,6 @@ let build_opts=[
 				else if(e.age>=4800) spr(326,e.x,e.y,color_grass)
 				else if(e.age>=2400) spr(325,e.x,e.y,color_grass)
 				else spr(324,e.x,e.y,color_grass)
-				// if(e.age>=7400) spr(298,e.x,e.y,color_grass,1,0,0,2,2)
-				// else if(e.age>=4800) spr(294,e.x,e.y,color_grass,1,0,0,2,2)
-				// else if(e.age>=2400) spr(294,e.x,e.y,color_grass,1,0,0,2,2)
-				// else spr(292,e.x,e.y,color_grass,1,0,0,2,2)
-				// print(e.age,e.x,e.y)
-				// label(e,e.age)
 			},
 			update(e){
 				e.age++
@@ -128,10 +121,22 @@ let ui={
 		print(stats.energy,x+10,y+(9*2)+1,15,false,1,true)
 		print(stats.food+"("+stats.hunger+")",x+10,y+(9*3)+1,15,false,1,true)
 	},
+	d_action_btn(x,y,s){
+		circ(x+1,y+18,5,13)
+		w=print("X "+s,x,y+16,1,true,1,true)
+		rect(x+1,y+13,w-5,11,13)
+		circ(x+w-5,y+18,5,13)
+		circb(x+1,y+18,4,1)
+		print("X "+s,x,y+16,1,true,1,true)
+	},
 	draw(){
 		this.d_menu(220,32)
 		this.d_stats(2,32)
 		print("x:"+player.x+" y:"+player.y+" day:"+day+" hour:"+hour+" t:"+t,5,124,1,true,1,true)
+		if(Math.abs(player.x-panda.x)<10&&Math.abs(player.y-panda.y)<10){
+			ui.d_action_btn(panda.x,panda.y,"hunt")
+		}
+
 	}
 }
 
@@ -178,7 +183,7 @@ let panda={
 		if(this.state=="idle") spr((((t%60)/30|0)+34),this.x,this.y,5,1,this.flip)
 		if(this.state=="walk") spr((((t%60)/30|0)+38),this.x,this.y,5,1,this.flip)
 		if(this.state=="hunt") spr((((t%60)/30|0)+38),this.x,this.y,5,1,this.flip)
-		label(this,this.state)
+		label(this,this.state)		
 	}
 }
 
@@ -279,6 +284,11 @@ let animals={
 					case "walk":spr(v+68,this.x,this.y,5,1,this.flip);break;
 				}
 				label(this, this.state+" "+v)
+				if(Math.abs(player.x-e.x)<10&&Math.abs(player.y-e.y)<10){
+					ui.d_action_btn(e.x,e.y,"hunt")
+					if(btnp(5)) stats.food++
+				}
+
 			}
 		}
 	}}
@@ -292,6 +302,7 @@ let player={
 	state:"idle",
 	update(){
 		this.state="idle"
+		// TODO: only if pixel is walkable
 		if(btn(0)){
 			this.state="walk"
 			this.y--
@@ -392,9 +403,9 @@ function TIC()
 
 	// actors
 	builds.forEach(draw)
+	player.draw()
 	animals_alive.forEach(draw)
 	panda.draw(t)
-	player.draw()
 
 	// ui
 	ui.draw()
