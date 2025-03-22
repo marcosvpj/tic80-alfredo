@@ -7,18 +7,30 @@
 // script:  js
 // saveid:  alfredowagner
 
-function label(e,s){/*print(s,e.x,e.y+10)*/}
-function update(e,i,a){	e.update(e,i,a)}
-function draw(e,i,arr){	if(!!e.draw) {e.draw(e)}}
+class Vector{
+	constructor(x,y){
+		this.x=x
+		this.y=y
+	}
+	add(v){
+		this.x+=v.x
+		this.y+=v.y
+	}
+}
+
+function label(e,s){ print(s,e.x-cam.x,e.y+10-cam.y)}
+function update(e,i,a){	if(!!e.update) e.update(e,i,a)}
+function draw(e,i,arr){	if(!!e.draw) e.draw(e)}
 function rnd(m){ return Math.floor(Math.random() * m)}
-function abs(i){return Math.abs(i)}
+function abs(i){ return Math.abs(i)}
 
 let debug=false
 //screen width/height
 let W=240
 let H=136
+let Wmax=W*3
 // scroll bounding distance
-let bdd = 30
+let bdd = 24
 
 // scroll bounding box 
 var minx=bdd
@@ -29,8 +41,8 @@ var maxy=H//-bdd
 let cam={x:0,y:0}
 
 function limitXY(e){
-	if(e.x>W*3)e.x--
-	if(e.x<W*3*-1)e.x++
+	if(e.x>Wmax)e.x--
+	if(e.x<Wmax*-1)e.x++
 	if(e.y<25)e.y++
 	if(e.y>127)e.y--
 }
@@ -174,7 +186,20 @@ let build_opts=[
 		}}
 
 	},
-	{id:4,s:321,name:"carrot",d:()=>{},
+	{id:4,s:236,name:"brick",d:()=>{},
+		b:()=>{return{
+			x:0,y:0,
+			costs:{money:5},
+			update(e){},
+			on_build(){
+				this.x=Math.floor((this.x-cam.x)/8)*8
+				this.y=Math.floor((this.y-cam.y)/8)*8
+				mset(this.x/8,(this.y/8)-3,236)},
+			draw(e){}
+		}}
+
+	},
+	{id:5,s:321,name:"carrot",d:()=>{},
 		b:()=>{return{
 			x:0,y:0,
 			costs:{money:1},
@@ -200,8 +225,8 @@ function build(i){
 	stats.money-=b.costs.money
 	b.x=player.x+cam.x
 	b.y=player.y+cam.y
-	builds.push(b)
 	if(!!b.on_build) b.on_build()
+	builds.push(b)
 }
 
 let ui={
@@ -223,7 +248,7 @@ let ui={
 		})
 	},
 	d_stats(x,y){
-		w=print(stats.food+" ("+stats.hunger+")",x+10,y+(9*3)+1,15,false,1,true)
+		var w=print(stats.food+" ("+stats.hunger+")",x+10,y+(9*3)+1,15,false,1,true)
 		rect(x-1,y-1,x+10+w,9*4,13)
 		spr(261,x,y+(9*0),color_grass)
 		spr(278,x,y+(9*1),color_grass)
@@ -245,9 +270,11 @@ let ui={
 	d_x_btn(x,y,s){this.d_action_btn(x,y,"X",s)},
 	d_a_btn(x,y,s){this.d_action_btn(x,y,"A",s)},
 	draw(){
-		print("stats.energy/stats.energy_cap:"+Math.floor(stats.energy/stats.energy_cap*100),5,104,1,true,1,true)
-		print("ax:"+(player.ax)+" ay:"+(player.ay),5,114,1,true,1,true)
-		print("x:"+player.x+" y:"+player.y+" cam.x:"+cam.x+" cam.y:"+cam.y+" day:"+day+" hour:"+hour+" t:"+t,5,124,1,true,1,true)
+		print("x:"+player.x+" y:"+player.y,5,84,1,true,1,true)
+		print("tx:"+player.tx+" ty:"+(player.ty),5,94,1,true,1,true)
+		print("sx:"+player.sx+" sy:"+(player.sy),5,104,1,true,1,true)
+		print("ax:"+player.ax+" ay:"+(player.ay),5,114,1,true,1,true)
+		print(" day:"+day+" hour:"+hour+" t:"+t,5,124,1,true,1,true)
 
 		this.d_menu(220,32)
 		this.d_stats(2,32)
@@ -268,10 +295,12 @@ let ui={
 
 let panda={
 	x:84,y:84,
+	ax:84,ay:84,
 	flip:0,
 	state:"idle",
 	update(e){
-		if(btnp(6)) this.state="hunt"
+		if(btnp(6)&&this.state!="hunt") this.state="hunt"
+		else if(btnp(6)&&this.state=="hunt") this.state="walk"
 
 		limitXY(this)
 		if(!(t%30/15)) return
@@ -282,34 +311,48 @@ let panda={
 					//TODO:find closest
 					if(e.type=="bird") target=e
 				})
-				if(this.x>target.x) this.x-=rnd(3)
-				if(this.x<target.x) this.x+=rnd(3)
-				if(this.y>target.y) this.y-=rnd(3)
-				if(this.y<target.y) this.y+=rnd(3)
+				var step=rnd(3)
+				if(this.ax>(target.x+cam.x) && is_walkable_tile(this.x-step,this.y)) this.x-=step
+				if(this.ax<(target.x+cam.x) && is_walkable_tile(this.x+step,this.y)) this.x+=step
+				if(this.ay>(target.y+cam.y) && is_walkable_tile(this.x,this.y-step)) this.y-=step
+				if(this.ay<(target.y+cam.y) && is_walkable_tile(this.x,this.y+step)) this.y+=step
 				
 				if(target.y<0) this.state="walk"
 				break;
 			case "walk":
-				if((this.x-cam.x)>(player.x)) this.x-=rnd(3)
-				if((this.x-cam.x)<(player.x)) this.x+=rnd(3)
-				if((this.y-cam.y)>(player.y)) this.y-=rnd(3)
-				if((this.y-cam.y)<(player.y)) this.y+=rnd(3)
-				if((this.x-cam.x)>(player.x)) this.flip=1
-				if((this.x-cam.x)<(player.x)) this.flip=0
-				if(Math.abs(this.x-(player.x))<30&&Math.abs(this.y-(player.y))<20) this.state="idle"
-			break			
+				var step=rnd(3)
+				if(this.ax>player.ax && is_walkable_tile(this.x-step,this.y)) this.x-=step
+				if(this.ax<player.ax && is_walkable_tile(this.x+step,this.y)) this.x+=step
+				if(this.ay>player.ay && is_walkable_tile(this.x,this.y-step)) this.y-=step
+				if(this.ay<player.ay && is_walkable_tile(this.x,this.y+step)) this.y+=step
+				if(this.ax>player.ax) this.flip=1
+				if(this.ax<player.ax) this.flip=0
+				if(Math.abs(this.ax-player.ax)<15 && Math.abs(this.ay-player.ay)<15) this.state="idle"
+			break
 			default:
-				if(Math.abs(panda.x-(player.x))>30||Math.abs(panda.y-(player.y))>20) this.state="walk"
+				if(this.ax>player.ax) this.flip=1
+				if(this.ax<player.ax) this.flip=0
+				if((Math.abs(panda.ax-player.ax)>15 || Math.abs(panda.ay-player.ay)>15)) this.state="walk"
 				else this.state="idle"
 			break;
 		}
-		
+		this.ax=this.x+cam.x
+		this.ay=this.y+cam.y
 	},
 	draw(t){
-		if(this.state=="idle") spr((((t%60)/30|0)+34),this.x-cam.x,this.y-cam.y,5,1,this.flip)
-		if(this.state=="walk") spr((((t%60)/30|0)+38),this.x-cam.x,this.y-cam.y,5,1,this.flip)
-		if(this.state=="hunt") spr((((t%60)/30|0)+38),this.x-cam.x,this.y-cam.y,5,1,this.flip)
-		label(this,this.state)		
+		if(this.state=="idle") spr((((t%60)/30|0)+34),this.x-cam.x-4,this.y-cam.y-4,5,1,this.flip)
+		if(this.state=="walk") spr((((t%60)/30|0)+38),this.x-cam.x-4,this.y-cam.y-4,5,1,this.flip)
+		if(this.state=="hunt") spr((((t%60)/30|0)+38),this.x-cam.x-4,this.y-cam.y-4,5,1,this.flip)
+		label(this,this.state)
+
+		//base
+		// rectb(this.x-cam.x,this.y-cam.y,1,1,11)
+		// rectb(this.x-cam.x-3,this.y-cam.y,1,1,4)
+		// rectb(this.x-cam.x+3,this.y-cam.y,1,1,4)
+		//top
+		// rectb(this.x-cam.x,this.y-cam.y-4,1,1,12)
+		// rectb(this.x-cam.x-3,this.y-cam.y-4,1,1,4)
+		// rectb(this.x-cam.x+3,this.y-cam.y-4,1,1,4)
 	}
 }
 
@@ -334,13 +377,13 @@ let animals={
 				switch (e.state) {
 					case "fly":
 						var v=3
-						if(Math.abs(panda.x-e.x)<5)v=5
-						if(e.x>panda.x)e.x+=rnd(v)
-						if(e.x<panda.x)e.x-=rnd(v)
+						if(Math.abs(panda.x-e.x)<5) v=5
+						if(e.x>panda.x) e.x+=rnd(v)
+						if(e.x<panda.x) e.x-=rnd(v)
 								
-						if(Math.abs(panda.y-e.y)<5)v=5
-						if(e.y>panda.y)e.y+=rnd(v)
-						if(e.y<=panda.y)e.y-=rnd(v)
+						if(Math.abs(panda.y-e.y)<5) v=5
+						if(e.y>panda.y) e.y+=rnd(v)
+						if(e.y<=panda.y) e.y-=rnd(v)
 								
 						if(this.x>234)this.x=234
 						if(this.x<-2)this.x=-2
@@ -353,8 +396,8 @@ let animals={
 						if(dx>0)this.flip=1
 						if(dx<0)this.flip=0
 						
-						this.x+=dx
-						this.y+=dy
+						if(is_walkable_tile(this.x+dx+3,this.y)&&is_walkable_tile(this.x+dx-3,this.y)) this.x+=dx
+						if(is_walkable_tile(this.x,this.y+dy-4)&&is_walkable_tile(this.x,this.y+dy)) this.y+=dy
 						limitXY(this)
 					break;
 					default: e.state="idle"; break;
@@ -364,11 +407,11 @@ let animals={
 			{
 				let v=(t%10/5|0)
 				switch (e.state) {
-					case "idle":spr(v+20,this.x-cam.x,this.y-cam.y,5,1,this.flip);break;
-					case "walk":spr(v+18,this.x-cam.x,this.y-cam.y,5,1,this.flip);break;
-					case "fly":spr(v+22,this.x-cam.x,this.y-cam.y,5,1,this.flip);break;
+					case "idle":spr(v+20,this.x-cam.x-4,this.y-cam.y-8,5,1,this.flip);break;
+					case "walk":spr(v+18,this.x-cam.x-4,this.y-cam.y-8,5,1,this.flip);break;
+					case "fly":spr(v+22,this.x-cam.x-4,this.y-cam.y-8,5,1,this.flip);break;
 				}
-				label(this, this.state+" "+v)
+				// label(this, this.state+" "+v)
 			}
 		}
 	}},
@@ -395,9 +438,9 @@ let animals={
 						if(dx>0)this.flip=1
 						if(dx<0)this.flip=0
 						
-						this.x+=dx
-						this.y+=dy
-						limitXY(this)
+						if(is_walkable_tile(this.x+dx+4,this.y)&&is_walkable_tile(this.x+dx-4,this.y)) this.x+=dx
+						if(is_walkable_tile(this.x,this.y+dy-4)&&is_walkable_tile(this.x,this.y+dy)) this.y+=dy
+						// limitXY(this)
 					break;
 					default: e.state="idle"; break;
 				}
@@ -428,102 +471,70 @@ let animals_alive=[
 let player={
 	x:96,y:24,
 	ax:96,ay:24,
+	tx:0,ty:0,
+	sx:96,sy:24,
 	plr:{x:96,y:24},
 	flip:1,
 	state:"idle",
+	left:{x:0,y:0},
+	right:{x:0,y:0},
+	up:{x:0,y:0},
+	down:{x:0,y:0},
 	update(){
-		var x=this.x-cam.x
-		var y=this.y-cam.y
-		var cell_x=Math.floor(x/8)
-		var cell_y=Math.floor(y/8)
-		var sprite_id=mget(cell_x,cell_y)
-		var flag=fget(sprite_id,0)
-
 		this.state="idle"
 		if (btn(0) ){
 			this.state="walk"
-			// if(can_walk(cell_x,Math.floor((y-1)/8))){
-				// print(x,y,flag)
-				// move player up if > bound
-				if (this.plr.y > 0 ){ this.plr.y = this.plr.y - 1 }
-				// move camera if player at scroll bound
-				//  and camera not at playfield limit
-				if (this.plr.y - cam.y < miny && cam.y > 0 ){cam.y = cam.y - 1 }
-			// }
+			if (this.y > 0 && is_walkable_tile(this.x,this.y-5)){ this.y = this.y - 1 }
+			if (this.y - cam.y < miny && cam.y > 0 ){cam.y = cam.y - 1 }
 		}
 		
 		if (btn(1) ){
 			this.state="walk"
-			// if(can_walk(cell_x,Math.floor((y+1)/8))){
-			//   // limit scroll to 2*screen height - 8 pixel (player size)
-			if (this.plr.y < H * 1 - 8) { this.plr.y = this.plr.y + 1 }
-			// limit camera at 2*H (Height) - H (its own Height) = H
-			if (this.plr.y - cam.y > maxy - 8 && cam.y < H ){ cam.y = cam.y + 1 }
-			// }
+			if (this.y < H * 1 - 8 && is_walkable_tile(this.x,this.y+3)) { this.y = this.y + 1 }
+			if (this.y - cam.y > maxy - 8 && cam.y < H ){ cam.y = cam.y + 1 }
 		}
-		// // same thing than vertically but horizontally
+
 		if (btn(2) ){ 
 			this.state="walk"
 			this.flip=0
-			// if(can_walk(Math.floor((x-1)/8),cell_y)){
-			if (this.plr.x > 0) { this.plr.x = this.plr.x - 1 }
-			if (this.plr.x - cam.x < minx && cam.x > 0 ){cam.x = cam.x - 1 }
-			// }
+			if (this.x > 0 && is_walkable_tile(this.x-5,this.y)) { this.x = this.x - 1 }
+			if (this.x - cam.x < minx && cam.x > 0 ){cam.x = cam.x - 1 }
 		}
 
 		if (btn(3) ){
 			this.state="walk"
 			this.flip=1
-			// if(can_walk(Math.floor((x+1)/8),cell_y)){
-			if (this.plr.x < W * 3 - 8 ){ this.plr.x = this.plr.x + 1 }
-			if (this.plr.x - cam.x > maxx-8 && cam.x < W*2 ){cam.x = cam.x + 1 }
-			// }
+			if (this.x < Wmax - 8 && is_walkable_tile(this.x+4,this.y)){ this.x = this.x + 1 }
+			if (this.x - cam.x > maxx-8 && cam.x < (Wmax-W) ){cam.x = cam.x + 1 }
 		}
+		this.sx=this.x-cam.x
+		this.sy=this.y-cam.y
 
-		this.x=this.plr.x-cam.x
-		this.y=this.plr.y-cam.y
+		this.ax=this.x+cam.x
+		this.ay=this.y+cam.y
 
-		this.ax=this.plr.x+cam.x
-		this.ay=this.plr.y+cam.y
+		this.tx=Math.floor((this.sx)/8)
+		this.ty=Math.floor((this.sy-23)/8)
 
-		// this.state="idle"
-		// if(btn(0)){
-			// this.state="walk"
-		// 	this.y--
-		// }
-		// if(btn(1)){
-		// 	this.state="walk"
-		// 	this.y++
-		// }
-		// if(btn(2)){
-		// 	this.state="walk"
-		// 	this.x--
-			// this.flip=0
-		// }
-		// if(btn(3)){
-		// 	this.state="walk"
-		// 	this.x++
-			// this.flip=1
-		// }
-
-		// if(this.x>234) this.x=234
-		// if(this.x< -2) this.x=-2
-		// if(this.y< 21) this.y=21
-		// if(this.y>127) this.y=127
-
-		if(!is_day&&pix(player.x+3,player.y+13)==7&&hour%120==0) stats.mind-=3
+		if(!is_day&&pix(player.x+3,player.y)==7&&hour%120==0) stats.mind-=3
 	},
-	draw(){spr((this.state=="walk"?0+((t%60)/30|0):0),this.x,this.y,5,1,this.flip,0,1,2)}
+	draw(){spr((this.state=="walk"?0+((t%60)/30|0):0),this.sx-4,this.sy-12,5,1,this.flip,0,1,2)}
 }
 
 let world={
+	on_create(){
+		var a=animals.pato.new(64,46)
+		// var a=animals.pato.new(rnd(Wmax),136)
+		animals_alive.push(a)
+	},
 	update(){
 		hour=t%2400
 		day=Math.floor(t/2400)
 		is_day=(hour/10<night_time)
 
 		if(!(t%120/60)&&animals_alive.length<5){
-			var a=animals.pato.new(rnd(246),136)
+			var a=animals.pato.new(90,50)
+			// var a=animals.pato.new(rnd(Wmax),136)
 			animals_alive.push(a)
 		}
 	},
@@ -566,10 +577,12 @@ let work={
 	draw(){elli(this.x-cam.x,this.y-cam.y,this.w,this.h,6)},
 }
 
-function can_walk(x,y){
-	var sprite_id=mget(x,y)
+function is_walkable_tile(x,y){
+	var sprite_id=mget(x/8,(y-23)/8)
 	return fget(sprite_id,0)
 }
+
+world.on_create()
 function TIC(){
 	// UPDATE
 	if(hour%60==0) stats.hunger+=10
@@ -610,8 +623,8 @@ function TIC(){
 }
 
 // <TILES>
-// 000:55555555558888558999999f5511115555e1e155551111555551155555999955
-// 001:55ffff55f999999f5511115555e1e15555111155555115555599995555999985
+// 000:555555555555555555555555558888558999999f5511115555e1e15555111155
+// 001:555555555555555555ffff55f999999f5511115555e1e1555511115555511555
 // 002:555555555555055555cc055550cccc005cccccc05555cccc55555c5555555c55
 // 003:555555555555c55555555c55000c5c5500ccc555cccc555555c5555555c55555
 // 004:555555555555055555cc055550cccc005cccccc05555cccc55555c5555555c55
@@ -623,8 +636,8 @@ function TIC(){
 // 010:5555555555cccc555cccccc55cccccc55cccccc55cccccc555cccc5555555555
 // 012:551111551222222155eeee55552e2e5555eeee55555ee5555599995555999985
 // 013:551111551222222155eeee55552e2e5555eeee55559999555999995559999985
-// 016:5599998559999885599918885991118859111188551551555555555555555555
-// 017:5999988559991888599111885911118851555515555555555555555555555555
+// 016:5551155555999955559999855999988559991888599111885911118855155155
+// 017:5599995555999985599998855999188859911188591111885155551555555555
 // 018:5555555555555555555550055555074055000d0550eee105550ddd0555504055
 // 019:555555555555555555550055555074055500d05550eee105550ddd0555504055
 // 020:555555555555555555555555555550055555074055000d0550eee105550ddd05
@@ -729,7 +742,7 @@ function TIC(){
 // 186:f8888888fbbbbbbbfb999999fb999999fb999999fb999999fb999999fb999999
 // 187:ffffffffbbbbbbb8999999b8999999b8999999b8999999b8999999b8999999b8
 // 188:999999bf999999bf999999bf999999bf999999bf999999bf999999bf999999bf
-// 189:5555555555555555555555555555555555555555555555555555555555555555
+// 189:555555555555555555555555555555555555555555555555555555555555555b
 // 190:fb999999fb999999fb999999fb999999fb999999fb999999fb999999fb999999
 // 191:9999999999b9999999b9999999b9999999b99999999999b9999999b999999999
 // 202:8b9999998b9999998b9999998b9999998b9999998b9999998bbbbbbbffffffff
@@ -741,7 +754,8 @@ function TIC(){
 // 221:9966669996777769967788899677776998666689988899999888888999888899
 // 222:9999999999999999999999999999999999999999999999999999999999999999
 // 223:9999999999b9999999b999b9999999b9999999b9999b9999999b9999999b9999
-// 237:ffffffff55555555555555555555555555555555555555555555555555555555
+// 236:500000050fddddf00deeeee00deeeee00deeeee00deeeee00feeeef050000005
+// 237:ffffffff5555555555555555555555555555555555555555555555555555555b
 // 238:55555555575755555575555555555555555555555555f5f555555f5555555555
 // 239:555555555dd555f55edd555555ee555555555dd55755ddd55555eee555555555
 // 246:9999999999999999999999999999999999999999999999999999999999999999
@@ -791,8 +805,7 @@ function TIC(){
 // 031:5555555555555555555555555555555555555555555555555555555555555555
 // 032:5fffffff5feefeef5feefeef5fffffff5feefeef5feefeef5fffffff5f555555
 // 033:ffffff55eefeef55eefeef55ffffff55eefeef55eefeef55ffffff5555555f55
-// 034:555555555ffffff5f55ff55fe55ff55ee55ff55e555ff555555ff555555ff555
-// 035:555555555ffffff5f55ff55f455ff554455ff554555ff555555ff555555ff555
+// 035:5555555555555555555555555555555555555555555555555555555555555555
 // 036:5555555555555555555555555555555555555555555555555555555555555555
 // 037:5555555555555555555555555555555555555555555555555555555555555555
 // 038:55555555555555555555555555555555555555555555555555555555555ff555
@@ -807,8 +820,8 @@ function TIC(){
 // 047:5555555555555555555555555555555555555555555555555555555555555555
 // 048:5fffffff5fedfedf5feefeef5fffffff5fedfedf5feefeef5fffffff5f555555
 // 049:ffffff55edfedf55eefeef55ffffff55edfedf55eefeef55ffffff5555555f55
-// 050:555ff555555ff555555ff555555ff555555ff555555ff55555ffff5555555555
-// 051:555ff555555ff555555ff555555ff555555ff555555ff55555ffff5555555555
+// 050:5555555555555555555555555555555555555555555555555555555555555555
+// 051:5555555555555555555555555555555555555555555555555555555555555555
 // 052:5555555555555fff5555f66f55555ff65555555f555555f355555fff55555555
 // 053:55f555555f6f5555f66f5555ffff5555f55f55554f555555fff5555555555555
 // 054:555f6ff55555f66f55555ff65555555f555555f3555555f355555fff55555555
@@ -1016,11 +1029,11 @@ function TIC(){
 
 // <MAP>
 // 000:d9e9d9d9b9dedededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededededec9dbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
-// 001:edfbededcbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
-// 002:edededfacbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbffdbdbdbdbdbdbdbdbffdbdbdbdbdbdbdbdbdbdbdbdbdbdbffdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbffdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
-// 003:edfbededcbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
-// 004:edededfacbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
-// 005:ededededcbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
+// 001:edfbededcbdbcecececececececedbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
+// 002:edededfacbdbcedbdbcedbdbdbcedbdbdbdbdbdbdbdbffdbdbcecedbcedbdbffdbdbdbdbdbdbdbdbdbdbdbdbdbdbffdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbffdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
+// 003:edfbededcbdbcedbdbcedbdbdbdbdbdbdbdbdbdbdbdbdbdbdbcedbdbcedbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
+// 004:edededfacbdbcecececedbdbdbcedbdbdbdbdbdbdbdbdbdbdbcedbdbcedbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
+// 005:ededededcbdbdbdbdbcececececedbdbdbdbdbdbdbdbdbdbdbcedbcecedbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
 // 006:edfaedfdcbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
 // 007:ededededcbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
 // 008:ededededcbdbdbdbdbeedbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbebdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
@@ -1149,7 +1162,7 @@ function TIC(){
 // 131:dbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
 // 132:dbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
 // 133:dbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
-// 134:dbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbf9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9dbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
+// 134:f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9dbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
 // 135:f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9f9dbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdbdb
 // </MAP>
 
