@@ -1,0 +1,57 @@
+// title:   game title
+// author:  game developer, email, etc.
+// desc:    short description
+// site:    website link
+// license: MIT License (change this to your license of choice)
+// version: 0.1
+// script:  js
+
+var t=0
+var x=96
+var y=24
+function BOOT(){sync(1<<5,0)}
+function TIC()
+{
+	if(btn(0))y--
+	if(btn(1))y++
+	if(btn(2))x--
+	if(btn(3))x++
+
+	cls(1)
+	spr(256+((t%60)/30|0),x,y,1)
+	print("HELLO WORLD!",84,84)
+	t++
+}
+
+// <TILES>
+// 187:c0ccc0cc0aa9cecc1a18cdcc1bc123401117cfcc1116cecc1115c0cc1110cccc
+// </TILES>
+
+// <SPRITES>
+// 000:111111111111111111bbbb111b9999b1b9c99c9bb999999bb999999b1bbbbbb1
+// 001:11111111111111111111111111bbbb111b9999b1b9c99c9bb999999b1bbbbbb1
+// </SPRITES>
+
+// <WAVES>
+// 000:00000000ffffffff00000000ffffffff
+// 001:0123456789abcdeffedcba9876543210
+// 002:0123456789abcdef0123456789abcdef
+// </WAVES>
+
+// <SFX>
+// 000:000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000304000000000
+// </SFX>
+
+// <TRACKS>
+// 000:100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+// </TRACKS>
+
+// <PALETTE>
+// 000:452b3ff5eeb0fabf61e08d518a58652c5e3b609c4fc6cc5478c2d65479b056546e839fa6e0d3c8f05b5b8f325feb6c98
+// 001:2322282842615f5854878573b8b095c3d5c7ebecdc2485a654bad2754d45c65046e6928a1e745355a058a1bf41e3c054
+// </PALETTE>
+
+// <PALETTE1>
+// 000:2322282842615f5854878573b8b095c3d5c7ebecdc2485a654bad2754d45c65046e6928a1e745355a058a1bf41e3c054
+// </PALETTE1>
+
